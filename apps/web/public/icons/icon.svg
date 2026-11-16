@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Alabor Dashboard">
+  <rect width="512" height="512" rx="112" fill="#1a222c"/>
+  <!-- tab -->
+  <path fill="#4bb08c" d="M148 168h92c10 0 19 4 26 12l14 16c4 5 10 8 17 8h67c20 0 36 16 36 36v12H148v-68c0-9 7-16 16-16z"/>
+  <!-- body -->
+  <path fill="#3d9a7a" d="M116 228c0-18 14-32 32-32h216c18 0 32 14 32 32v148c0 18-14 32-32 32H148c-18 0-32-14-32-32V228z"/>
+</svg>
