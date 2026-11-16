@@ -1,6 +1,5 @@
 "use client";
 
-import { startAuthentication } from "@simplewebauthn/browser";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -15,99 +14,43 @@ export function LoginActions({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  function goNext() {
-    router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/apps");
-    router.refresh();
-  }
-
-  async function passkeyLogin() {
-    setBusy(true);
-    setError(null);
-    try {
-      const optRes = await fetch("/api/webauthn/login/options", {
-        method: "POST",
-      });
-      const optJson = (await optRes.json()) as {
-        error?: string;
-        challengeId?: string;
-        options?: Parameters<typeof startAuthentication>[0]["optionsJSON"];
-      };
-      if (!optRes.ok || !optJson.challengeId || !optJson.options) {
-        setError(
-          optJson.error === "no_credentials"
-            ? "Noch kein Passkey — zuerst registrieren"
-            : "Login fehlgeschlagen",
-        );
-        return;
-      }
-
-      const assertion = await startAuthentication({
-        optionsJSON: optJson.options,
-      });
-
-      const verRes = await fetch("/api/webauthn/login/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          challengeId: optJson.challengeId,
-          response: assertion,
-        }),
-      });
-      if (!verRes.ok) {
-        setError("Passkey nicht akzeptiert");
-        return;
-      }
-      goNext();
-    } catch (err) {
-      setError(
-        err instanceof Error && err.name === "NotAllowedError"
-          ? "Abgebrochen oder Biometrie nicht verfügbar"
-          : "Login fehlgeschlagen",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function stubLogin() {
+  async function devLogin() {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/dev/session", { method: "POST" });
       if (!res.ok) {
-        setError("Stub-Session fehlgeschlagen");
-        return;
+        const body = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error || `HTTP ${res.status}`);
       }
-      goNext();
-    } catch {
-      setError("Netzwerkfehler");
+      router.push(nextPath && nextPath.startsWith("/") ? nextPath : "/apps");
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Dev-Login fehlgeschlagen");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div>
-      <div className="btn-row">
+    <div className="btn-row">
+      {allowDev ? (
         <button
           type="button"
           className="btn"
           disabled={busy}
-          onClick={passkeyLogin}
+          onClick={() => void devLogin()}
         >
-          {busy ? "…" : "Mit Passkey anmelden"}
+          {busy ? "…" : "Dev-Session"}
         </button>
-        {allowDev ? (
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={busy}
-            onClick={stubLogin}
-          >
-            Dev: Session setzen
-          </button>
-        ) : null}
-      </div>
+      ) : (
+        <p className="muted">
+          Ohne Gate-Headers erreichst du diese Seite nur lokal mit{" "}
+          <code>ALLOW_DEV_SESSION=1</code>.
+        </p>
+      )}
       {error ? <p className="error">{error}</p> : null}
     </div>
   );

@@ -1,39 +1,35 @@
-# Cloudflare Tunnel — `dashboard.myalabor.ch`
+# Cloudflare Tunnel — myalabor Auth-Tor
 
-Stand: M0. Öffentlicher Zugang läuft über den **bestehenden** Cloudflare-Tunnel
-(wie `auto.myalabor.ch` → AlaborsCar). Das Dashboard bindet nur Loopback.
+Stand: Tor-1. Edge bleibt der bestehende Tunnel; Auth-Wahrheit ist Pocket ID + oauth2-proxy auf dem Pi.
 
 ## Ziel-Ingress
 
 | Public hostname | Service |
 |-----------------|---------|
-| `dashboard.myalabor.ch` | `http://127.0.0.1:8790` |
-| `einkaufen.myalabor.ch` | `http://127.0.0.1:8791` (Einkaufsliste, bestehend) |
+| `auth.myalabor.ch` | `http://127.0.0.1:1411` (Pocket ID) |
+| `dashboard.myalabor.ch` | `http://127.0.0.1:4180` (oauth2-proxy → dashboard `:8790`) |
+| `einkaufen.myalabor.ch` | `http://127.0.0.1:4181` (oauth2-proxy → Einkauf) |
+| `anki-lern.myalabor.ch` | `http://127.0.0.1:4182` (oauth2-proxy → Anki, sobald live) |
+| `notes.myalabor.ch` | `http://127.0.0.1:4183` (oauth2-proxy → Notes, sobald live) |
 
-Bestehend (unverändert lassen):
+Bestehend (unverändert lassen, bis hinter Gate gezogen):
 
 | Public hostname | Service |
 |-----------------|---------|
 | `auto.myalabor.ch` | `https://localhost:8778` (AlaborsCar) |
 
-## Schritte (Cloudflare Zero Trust UI)
+Ports `418x` sind Beispiele — an [deploy/auth](../../deploy/auth) anpassen.
 
-1. Zero Trust → Networks → Tunnels → bestehenden Tunnel öffnen.
-2. **Public Hostname** hinzufügen:
-   - Subdomain: `dashboard`
-   - Domain: `myalabor.ch`
-   - Type: HTTP
-   - URL: `127.0.0.1:8790`
-3. Speichern. DNS-CNAME wird i. d. R. automatisch gesetzt.
-
-Alternativ in `config.yml` des Tunnels (falls dateibasiert):
+## config.yml (Skizze)
 
 ```yaml
 ingress:
+  - hostname: auth.myalabor.ch
+    service: http://127.0.0.1:1411
   - hostname: dashboard.myalabor.ch
-    service: http://127.0.0.1:8790
+    service: http://127.0.0.1:4180
   - hostname: einkaufen.myalabor.ch
-    service: http://127.0.0.1:8791
+    service: http://127.0.0.1:4181
   - hostname: auto.myalabor.ch
     service: https://localhost:8778
     originRequest:
@@ -41,27 +37,23 @@ ingress:
   - service: http_status:404
 ```
 
-## Smoke nach Deploy
+## Schritte (Zero Trust UI)
 
-Auf dem Pi (oder per SSH):
+1. Tunnels → bestehenden Tunnel.  
+2. Public Hostname `auth` → HTTP `127.0.0.1:1411`.  
+3. `dashboard` / Apps auf die jeweiligen Proxy-Ports umstellen (nicht mehr direkt `:8790`).  
+4. DNS-CNAME prüfen.
+
+## Smoke
 
 ```bash
-wget -qO- http://127.0.0.1:8790/api/health
+curl -fsS https://auth.myalabor.ch/ >/dev/null
+curl -fsS http://127.0.0.1:8790/api/health   # loopback ohne Gate
+curl -fsSI https://dashboard.myalabor.ch/apps  # erwartet Redirect zum IdP ohne Cookie
 ```
-
-Von außen (nach Ingress):
-
-```bash
-curl -fsS https://dashboard.myalabor.ch/api/health
-```
-
-Erwartet: JSON `{"ok":true,"service":"alabors-dashboard",…}`.
 
 ## Hinweise
 
-- Dashboard-Prozess: siehe `scripts/deploy-pi.sh` und `deploy/bin/dashboard-pi-run.sh`.
-- Port **8790** (nicht 8780 — das nutzt Voicemessage Manager auf dem Pi).
-- Kein neuer öffentlicher Port auf dem Router.
-- WebAuthn (M1) braucht exakt `WEBAUTHN_RP_ID=dashboard.myalabor.ch` und
-  `WEBAUTHN_ORIGIN=https://dashboard.myalabor.ch`.
-- Boot-Autostart (piCore `bootlocal`) analog AlaborsCar — Follow-up nach M0.
+- Dashboard-Prozess weiter loopback `:8790`; öffentlich nur über Proxy.  
+- WebAuthn-RP-ID ist der **IdP-Host** (`auth.myalabor.ch`), nicht `dashboard`.  
+- Kein neuer Router-Port.

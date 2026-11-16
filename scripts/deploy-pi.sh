@@ -110,25 +110,23 @@ ensure_remote_layout() {
   ssh_pi "sudo mkdir -p '$PI_REMOTE' '$PI_DATA' && sudo chown -R tc:staff '$PI_REMOTE' '$PI_DATA'"
   if ! ssh_pi "test -f '$PI_DATA/env'"; then
     echo "creating $PI_DATA/env skeleton" >&2
-    local secret
-    secret="$(openssl rand -hex 32)"
-    local bootstrap
-    bootstrap="$(openssl rand -hex 24)"
     ssh_pi "cat > '$PI_DATA/env' <<EOF
-SESSION_SECRET=$secret
+AUTH_MODE=proxy
 ALLOW_DEV_SESSION=0
+ADMIN_SUBJECTS=
+POCKET_ID_URL=https://auth.myalabor.ch
+OAUTH2_SIGN_OUT_URL=https://dashboard.myalabor.ch/oauth2/sign_out
+# APP_GRANTS=einkaufsliste:*;lumito:*;alabors-drive:*;apple-anki:you@example.com
 HOST=127.0.0.1
 PORT=8790
 HOSTNAME=127.0.0.1
-DATABASE_PATH=$PI_DATA/dashboard.db
-WEBAUTHN_RP_ID=dashboard.myalabor.ch
-WEBAUTHN_ORIGIN=https://dashboard.myalabor.ch
-SETUP_BOOTSTRAP_SECRET=$bootstrap
 LUMITO_URL=http://192.168.1.172:8080/
 ALABORS_DRIVE_URL=https://auto.myalabor.ch/web/drive.html
-# EINKAUF_URL=
+ANKI_LERN_URL=https://anki-lern.myalabor.ch/
+NOTES_URL=https://notes.myalabor.ch/
+# EINKAUF_URL=https://einkaufen.myalabor.ch/
 EOF"
-    echo "SETUP_BOOTSTRAP_SECRET (once): $bootstrap" >&2
+    echo "Fill ADMIN_SUBJECTS + APP_GRANTS in $PI_DATA/env after Pocket ID bootstrap" >&2
   fi
 }
 

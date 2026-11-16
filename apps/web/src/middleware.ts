@@ -1,25 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
-import { SESSION_COOKIE } from "@/lib/auth/session";
 
 const PROTECTED = ["/apps", "/settings"];
 
-function secretKey() {
-  const secret = process.env.SESSION_SECRET?.trim();
-  if (!secret || secret.length < 32) return null;
-  return new TextEncoder().encode(secret);
+function hasProxyIdentity(req: NextRequest): boolean {
+  const user =
+    req.headers.get("x-forwarded-user")?.trim() ||
+    req.headers.get("x-auth-request-user")?.trim() ||
+    "";
+  const email =
+    req.headers.get("x-forwarded-email")?.trim() ||
+    req.headers.get("x-auth-request-email")?.trim() ||
+    "";
+  return Boolean(user || email);
 }
 
-async function hasValidSession(req: NextRequest): Promise<boolean> {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  const key = secretKey();
-  if (!token || !key) return false;
-  try {
-    await jwtVerify(token, key);
-    return true;
-  } catch {
-    return false;
-  }
+function hasDevSession(req: NextRequest): boolean {
+  if (process.env.ALLOW_DEV_SESSION !== "1") return false;
+  const mode = process.env.AUTH_MODE?.trim().toLowerCase();
+  const isDev =
+    mode === "dev" || (mode !== "proxy" && process.env.NODE_ENV !== "production");
+  if (!isDev) return false;
+  return Boolean(req.cookies.get("alabor_dev_session")?.value);
 }
 
 export async function middleware(req: NextRequest) {
@@ -29,7 +30,9 @@ export async function middleware(req: NextRequest) {
   );
   if (!needsAuth) return NextResponse.next();
 
-  if (await hasValidSession(req)) return NextResponse.next();
+  if (hasProxyIdentity(req) || hasDevSession(req)) {
+    return NextResponse.next();
+  }
 
   const login = new URL("/", req.url);
   login.searchParams.set("next", pathname);

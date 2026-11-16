@@ -7,6 +7,8 @@ dist/
 .next/
 deploy/pi.env
 deploy/.cache/
+deploy/auth/.env
+deploy/auth/pocket-id-data/
 apps/web/.env.local
 apps/web/.env.production.local
 *.log

@@ -1,26 +1,37 @@
 # Alabors Dashboard
 
-Privater App-Launcher unter `dashboard.myalabor.ch` (Passkey-Auth ab M1).
+Privater App-Launcher unter `dashboard.myalabor.ch` — **Tor / Katalog**, nicht App-Auth.
+
+**Auth-Vertrag (Source of Truth):**  
+[alabor-harness/docs/AUTH-HARNESS.md](https://github.com/tompommepoire/alabor-harness/blob/main/docs/AUTH-HARNESS.md)
+
+Passkeys und Sessions liegen bei **Pocket ID** (`auth.myalabor.ch`) + **oauth2-proxy** (Forward-Auth). Das Dashboard katalogisiert Apps und startet sie hinter dem Gate — ohne eigene Passkey-Verifier und ohne Pair-Tokens in URLs.
 
 - PRD: [docs/PRD.md](docs/PRD.md)
 - Architektur: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- §4 Checkliste (Tor): [docs/AUTH-CHECKLIST.md](docs/AUTH-CHECKLIST.md)
+- Pocket ID: [docs/ops/pocket-id.md](docs/ops/pocket-id.md)
+- Forward-Auth: [docs/ops/oauth2-proxy.md](docs/ops/oauth2-proxy.md)
 - Tunnel: [docs/ops/cloudflare-tunnel.md](docs/ops/cloudflare-tunnel.md)
+- Später Exchange/`inherit`: [docs/AUTH-EXCHANGE.md](docs/AUTH-EXCHANGE.md)
 
-## Lokal
+## Lokal (ohne Proxy)
 
 ```bash
 cd apps/web
-cp .env.example .env.local   # SESSION_SECRET + SETUP_BOOTSTRAP_SECRET setzen
+cp .env.example .env.local   # AUTH_MODE=dev, ALLOW_DEV_SESSION=1
 npm install
 npm run dev
 ```
 
 - Health: http://127.0.0.1:3000/api/health  
-- Erster Admin: `/register` mit Bootstrap-Secret + Passkey (localhost)
-- Danach Login per Passkey; Admin → `/settings/tokens` für weitere Einladungen
-- Optional `ALLOW_DEV_SESSION=1`: Stub-Login ohne Biometrie
+- Dev-Login ohne Biometrie wenn `ALLOW_DEV_SESSION=1`
 
-## Deploy auf den Pi
+## Produktiv
+
+1. Pocket ID + oauth2-proxy auf dem Pi ([deploy/auth](deploy/auth)).
+2. Tunnel-Hosts → Proxy (Apps + Dashboard); `auth.myalabor.ch` → Pocket ID.
+3. Dashboard mit `AUTH_MODE=proxy` hinter dem Gate.
 
 ```bash
 cp deploy/pi.env.example deploy/pi.env
@@ -28,11 +39,6 @@ HARNESS_CONFIRM=1 ./scripts/deploy-pi.sh
 ./scripts/deploy-pi.sh smoke
 ```
 
-Baut standalone auf dem Dev-Host, rsync’t inkl. Node linux-arm64 nach
-`/mnt/mmcblk0p2/dashboard`, startet auf `127.0.0.1:8790`.
+## Katalog-Apps
 
-Danach Cloudflare-Ingress laut `docs/ops/cloudflare-tunnel.md`.
-
-## MVP-Apps
-
-Einkaufsliste, Lumito (LAN), Car-App (`auto.myalabor.ch`).
+Einkaufen (`shared`), Lumito (`choose`+`app-local`), Car-App, Anki / Notes (Soll `inherit`, Ist-Übergabe `none` — ehrlich kennzeichnen).

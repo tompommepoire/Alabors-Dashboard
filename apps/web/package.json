@@ -9,9 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@simplewebauthn/browser": "^14.0.0",
-    "@simplewebauthn/server": "^14.1.0",
-    "jose": "^5.10.0",
     "next": "^15.5.29",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

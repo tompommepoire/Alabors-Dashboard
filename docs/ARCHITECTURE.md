@@ -1,7 +1,9 @@
 # Mini-Architektur: Alabor Dashboard
 
-**Bezug:** [PRD](./PRD.md) v0.3  
-**Scope:** Multi-User App-Launcher auf Raspberry Pi unter `dashboard.myalabor.ch`
+**Bezug:** [PRD](./PRD.md) v0.4  
+**Auth-Vertrag:** [alabor-harness AUTH-HARNESS.md](https://github.com/tompommepoire/alabor-harness/blob/main/docs/AUTH-HARNESS.md) (§2 / §2c / §3c)  
+**§4 Checkliste:** [AUTH-CHECKLIST.md](./AUTH-CHECKLIST.md)  
+**Scope:** Tor / App-Katalog auf Raspberry Pi unter `dashboard.myalabor.ch`
 
 ---
 
@@ -11,95 +13,64 @@
  Internet
     │
     ▼
- Cloudflare Tunnel (bestehend)
-    │  Host-Regel: dashboard.myalabor.ch
-    ▼
- Raspberry Pi (always-on, z. B. 192.168.1.58)
+ Cloudflare Tunnel
     │
-    ├─ dashboard  (Node, loopback :8790)  ← NEU (8780 = Voicemessage)
-    ├─ AlaborsCar ( :8778 )               ← auto.myalabor.ch
-    └─ Einkaufsliste ( :8791 )            ← geplant am Tunnel
+    ├─ auth.myalabor.ch      → Pocket ID (:1411)
+    ├─ dashboard.myalabor.ch → oauth2-proxy → dashboard (:8790)
+    ├─ einkaufen.myalabor.ch → oauth2-proxy → Einkaufsliste
+    └─ … weitere Apps hinter demselben Gate
          │
          ▼
-    SQLite (Datei auf persistenter Partition)
-         users | credentials | setup_tokens | sessions
+ Raspberry Pi
+    Pocket ID (SQLite) | oauth2-proxy | dashboard (Next standalone)
 ```
 
-**Prinzip:** Auth-Gate + Katalog. Apps bleiben eigene Prozesse; Tunnel routet nur Hostname → Port.
+**Prinzip:** Fremd-IdP + Forward-Auth = Schicht A (Tor). Dashboard = Katalog/UX. Apps wählen ihren §3-Modus selbst; Start-Links ohne Langzeit-Pair-URLs.
 
-Bestehende Ops-Lage (Ist):
+Ops-Lage:
 
 - Pi: `tc@192.168.1.58`, Persistenz unter `/mnt/mmcblk0p2/…`
-- Öffentlich: Cloudflare-Tunnel; heute u. a. `auto.myalabor.ch` → `localhost:8778`
-- EliteBook: Lumito + Server-Manager (LAN)
+- Edge: Cloudflare Tunnel (kein neuer öffentlicher Port)
 
 ---
 
-## 2. Stack (Pi-tauglich)
+## 2. Stack
 
 | Schicht | Wahl | Warum |
 |---------|------|--------|
-| UI/API | **Next.js** (standalone output) **oder** SvelteKit | SSR + API; Build auf Dev-Maschine, Artefakt auf Pi |
-| Auth | **@simplewebauthn/server** + browser client | Passkeys / Fingerprint |
-| Session | signiertes HttpOnly-Cookie (iron-session / José) | kein Token in JS |
-| DB | **SQLite** (better-sqlite3 oder libsql) | ein File, Pi-freundlich, Backup = copy |
-| Katalog | `apps.config.ts` (+ optional Secrets aus Env) | kein Admin-UI nötig |
-| Edge | **Cloudflare Tunnel** Ingress | wie AlaborsCar; kein neuer öffentlicher Port |
-| Process | systemd / bootlocal-Hook analog AlaborsCar | Restart, Logs |
+| UI/API | **Next.js** standalone | SSR + API; Build auf Dev-Host |
+| Auth | **Pocket ID** (OIDC, Passkeys) | Harness §2c — kein Eigenbau-WebAuthn |
+| Gate | **oauth2-proxy** Forward-Auth | Session vor `*.myalabor.ch` |
+| Katalog | `apps-catalog.ts` + `APP_GRANTS` | Pro-Konto-Sichtbarkeit |
+| Edge | Cloudflare Tunnel | wie AlaborsCar |
+| Process | Skripte / bootlocal | Restart, Logs |
 
 ### Pi-Constraint
 
-- **Nicht** auf dem Pi bauen (Node/ARM-Build langsam, RAM).  
-  Flow: `npm run build` auf Mini-PC → `rsync` standalone + `node server.js` auf Pi.
-- Next.js standalone ist ok, wenn Memory-Limit beachtet wird; Alternative bei Druck: SvelteKit adapter-node (oft leichter).
-- Default-Empfehlung bleibt Next.js, solange Standalone &lt; ~150 MB RSS im Idle akzeptabel ist.
+Nicht auf dem Pi bauen. Flow: `npm run build` → `rsync` standalone → `node server.js` auf Loopback.
 
 ---
 
-## 3. Multi-User Auth
+## 3. Auth (Tor)
 
-### 3.1 Rollen
+### 3.1 Identität
 
-| Rolle | Kann |
-|-------|------|
-| `admin` | Setup-Tokens in Settings-UI erzeugen/invalidieren, User/Devices sehen |
-| `member` | Login, Katalog, eigene Passkeys verwalten |
+oauth2-proxy setzt nach Login Headers an Upstream (u. a. `X-Forwarded-User`, `X-Forwarded-Email`). Dashboard liest daraus den Gate-User — **kein** eigenes Session-JWT, **keine** WebAuthn-Ceremony.
 
-Erster User, der mit Bootstrap-`SETUP_BOOTSTRAP_SECRET` registriert, wird `admin`. Weitere User nur via Admin-Token aus der Settings-UI.
+| Rolle | Quelle |
+|-------|--------|
+| `admin` | Subject/E-Mail in `ADMIN_SUBJECTS` (Env) |
+| `member` | jeder andere authentifizierte User |
 
-### 3.2 Setup-Token (Settings-UI)
+Erstkeys / Passkey-Enrollment / Session-Widerruf: **Pocket ID** (Self-Service + Admin-Invites). Dashboard verlinkt nur.
 
-```
-Admin (eingeloggt): /settings/tokens
-   → POST /api/admin/setup-tokens  { label, ttl?, bound_user_id? }
-   → UI zeigt plaintext Token / Copy-Link einmalig
-   → DB speichert nur SHA-256(token), TTL, created_by, uses_left
+### 3.2 Local Dev
 
-User:  GET /register?token=…
-        → POST /api/webauthn/register/options  { token, displayName }
-        → credentials.create()
-        → POST /api/webauthn/register/verify
-        → User + Credential angelegt, Token uses_left--
-        → Session-Cookie
-```
+`AUTH_MODE=dev` + `ALLOW_DEV_SESSION=1`: Stub-Login ohne Proxy. Nie in Prod.
 
-Weitere Geräte: `/settings/devices` (eigene Session) **oder** Admin stellt gebundenes Token aus.
+### 3.3 Logout
 
-### 3.3 Login
-
-```
-POST /api/webauthn/login/options   → challenge
-navigator.credentials.get()
-POST /api/webauthn/login/verify    → Session (user_id, role, expires)
-```
-
-Discoverable credentials (Passkeys) bevorzugt, damit kein Username-Feld nötig ist; optional Username-Fallback.
-
-### 3.4 Session
-
-- Cookie: `Secure`, `HttpOnly`, `SameSite=Lax`
-- TTL: z. B. 14 Tage
-- Server-side Session-Row oder signed sealed cookie + optional revoke-list
+Redirect auf oauth2-proxy `/oauth2/sign_out` (bzw. IdP end-session). Kein GET-State-Change im Dashboard selbst außer Redirect.
 
 ---
 
@@ -107,174 +78,77 @@ Discoverable credentials (Passkeys) bevorzugt, damit kein Username-Feld nötig i
 
 | Route | Schutz | Zweck |
 |-------|--------|--------|
-| `/` | public | Login oder Redirect `/apps` |
-| `/register` | setup-token | Onboarding |
-| `/apps` | session | Launcher |
-| `/settings/devices` | session | eigene Passkeys |
-| `/settings/tokens` | admin | Setup-Tokens erzeugen, kopieren, invalidieren |
-| `/api/webauthn/*` | challenge | Register/Login |
-| `/api/admin/setup-tokens` | admin session | Token CRUD |
-| `/api/apps` | session | Katalog (inkl. LAN-only) |
-| `/api/logout` | session | invalidate |
+| `/` | Gate | Redirect → `/apps` wenn User da; sonst Dev-Login / Hinweis |
+| `/apps` | Gate | Launcher (konto-gefiltert) |
+| `/settings/security` | Gate | Links zu Pocket-ID Passkeys/Sessions/Admin |
+| `/api/apps` | Gate | JSON-Katalog |
+| `/api/health` | public (Proxy skip) | Smoke |
+| `/api/logout` | Gate | Redirect Sign-Out |
 
-Unauth: Login-HTML ohne App-Namen/URLs.
+Unauth erreicht Upstream in Prod nicht (Proxy).
 
 ---
 
-## 5. Datenmodell
+## 5. App-Katalog
 
-```
-User
-  id, display_name, role ('admin'|'member'), created_at
+Metadaten pro App (Harness §5 spiegeln, Vertrag nicht kopieren):
 
-WebAuthnCredential
-  id, user_id, credential_id, public_key, counter,
-  transports, device_label, created_at, last_used_at
+- `authMode`: `shared` \| `inherit` \| `choose` \| `reauth` \| …
+- `handoff`: `none` \| `session-cookie` \| `exchange` \| `handoff-once`
+- `visibleTo`: Allowlist von Subjects/`*` via `APP_GRANTS`
 
-SetupToken
-  id, token_hash, label, created_by_user_id,
-  bound_user_id NULL,   -- NULL = neuer User; gesetzt = extra Gerät
-  expires_at, uses_left, created_at
-
-Session
-  id, user_id, expires_at, created_at
-
-AuditEvent (optional)
-  id, type, user_id?, at, meta_json
-```
+Start-URL = Origin/Pfad **ohne** Pair-/Device-Token. Wenn `authMode=inherit` und `handoff=none`: UI-Hinweis, nicht als „eingeloggt starten“ verkaufen.
 
 ---
 
-## 6. App-Katalog (MVP)
-
-```ts
-// apps.config.ts — nur Server
-export const apps = [
-  {
-    id: "einkaufsliste",
-    name: "Einkaufsliste",
-    description: "Familienliste",
-    url: process.env.EINKAUF_URL!, // Token-URL nicht committen
-    icon: "cart",
-    network: "public", // sobald Tunnel-Regel steht
-  },
-  {
-    id: "lumito",
-    name: "Lumito",
-    description: "Haus-IPTV",
-    url: process.env.LUMITO_URL ?? "http://192.168.1.172:8080/",
-    icon: "tv",
-    network: "lan", // Badge „Nur Heimnetz“
-  },
-  {
-    id: "alabors-drive",
-    name: "Car-App",
-    description: "eDrive / SoC",
-    url: "https://auto.myalabor.ch/web/drive.html",
-    icon: "car",
-    network: "public",
-  },
-] as const;
-```
-
-- Response nur mit Session; LAN-Apps **nicht** ausblenden.
-- UI: Badge wenn `network === "lan"`.
-- Kein Client-Side Reachability-Check in v1 (optional P2).
-
----
-
-## 7. Sicherheit
+## 6. Sicherheit
 
 | Maßnahme | Detail |
 |----------|--------|
-| Passkey-only | kein Passwort-Store |
-| Setup-Token | nur Hash in DB, kurz TTL, uses_left |
-| Origin / rpId | `dashboard.myalabor.ch` |
-| Challenges | einmalig, kurzlebig |
-| Cookie | Secure + HttpOnly + SameSite |
-| Bind | Dashboard nur `127.0.0.1` — Tunnel terminiert TLS |
-| Rate limit | Register/Login (IP + token) |
+| Passkeys | nur Pocket ID (`auth.myalabor.ch`) |
+| Gate | ohne IdP-Session kein App-/Dashboard-Zugriff |
+| Headers | Identity nur aus Proxy; Dashboard setzt keine Parent-Domain-Session |
 | Katalog | nie an unauth Clients |
-| Trennung | Dashboard-Auth ≠ App-Auth (Drive/Lumito/Einkauf behalten eigene Modelle) |
+| Pair-URLs | verboten im Dashboard |
+| CSP | Next headers; Follow-up härten |
 
 ---
 
-## 8. Deploy auf dem Pi
+## 7. Deploy
 
 ```
-DNS / CF Zero Trust:
-  dashboard.myalabor.ch  →  http://localhost:8790
-
-Pi Layout (Vorschlag):
-  /mnt/mmcblk0p2/dashboard/          # App (standalone)
-  /mnt/mmcblk0p2/dashboard-data/     # SQLite + backups
-  Env-Datei gitignored auf dem Pi
-
-Deploy-Skript (analog AlaborsCar deploy-pi.sh):
-  1. build auf Dev-Host
-  2. rsync standalone + static
-  3. restart service
-  4. smoke: curl -H Host:dashboard… /api/health
+/mnt/mmcblk0p2/auth/           # Pocket ID + oauth2-proxy (compose)
+/mnt/mmcblk0p2/dashboard/      # Next standalone
+/mnt/mmcblk0p2/dashboard-data/ # optional lokale Daten
 ```
 
-Env:
+Siehe [ops/pocket-id.md](./ops/pocket-id.md), [ops/oauth2-proxy.md](./ops/oauth2-proxy.md), [ops/cloudflare-tunnel.md](./ops/cloudflare-tunnel.md).
+
+Env (Dashboard, Auszug):
 
 ```
-SESSION_SECRET=…
-WEBAUTHN_RP_ID=dashboard.myalabor.ch
-WEBAUTHN_ORIGIN=https://dashboard.myalabor.ch
-SETUP_BOOTSTRAP_SECRET=…   # nur für allerersten Admin
-DATABASE_PATH=/mnt/mmcblk0p2/dashboard-data/dashboard.db
-PORT=8790
-HOST=127.0.0.1
+AUTH_MODE=proxy
+ADMIN_SUBJECTS=tom@example.com
+OAUTH2_SIGN_OUT_URL=https://dashboard.myalabor.ch/oauth2/sign_out
+POCKET_ID_URL=https://auth.myalabor.ch
+APP_GRANTS=einkaufsliste:*;lumito:*;alabors-drive:*;apple-anki:sub1;mininotes:sub1
 ```
 
 ---
 
-## 9. Repo-Struktur
-
-```
-alabors-dashboard/
-  docs/PRD.md
-  docs/ARCHITECTURE.md
-  apps/web/                 # Next (oder SvelteKit)
-    app/…
-    lib/auth/…
-    lib/db/…
-    apps.config.ts
-  deploy/
-    pi.env.example
-    deploy-pi.sh
-    dashboard.service       # oder bootlocal-Snippet
-  scripts/
-    admin-token.ts          # CLI Setup-Token
-```
-
----
-
-## 10. Phasen
+## 8. Phasen
 
 | Phase | Lieferumfang |
 |-------|----------------|
-| **M0** | Skeleton + health + Deploy-Skript Pi + CF-Ingress-Doku — **done** |
-| **M1** | SQLite Users + Setup-Token Register + Passkey Login + Session + Tokens-UI — **done** |
-| **M2** | `/apps` Launcher mit MVP-Trio + LAN-Badge — **done** (mit M0) |
-| **M3** | Device-Management, Rate-Limit, Audit, Boot-Autostart |
+| **M0–M2** | Skeleton, Deploy, Katalog — historisch |
+| **Tor-0** | Docs + §4 Checkliste Tor |
+| **Tor-1** | Pocket ID + Tunnel `auth` |
+| **Tor-2** | oauth2-proxy; WebAuthn-Eigenbau entfernt |
+| **Tor-3** | Katalog pro Konto + Security-Links |
+| **Tor-4** | Exchange/`inherit` — [AUTH-EXCHANGE.md](./AUTH-EXCHANGE.md) (später) |
 
 ---
 
-## 11. Risiken
+## 9. Default-Entscheidung
 
-| Risiko | Mitigation |
-|--------|------------|
-| Next.js zu schwer für Pi | Standalone messen; Fallback SvelteKit/Astro |
-| Passkey verloren | ≥2 Geräte / neues Setup-Token |
-| Token-URL Einkaufsliste im Katalog | nur Env + auth’ed API |
-| Tunnel-Fehlkonfig | Dashboard nur loopback; Smoke nach Deploy |
-| Multi-User Verwechslung | Discoverable Passkeys; Anzeigename im Header |
-
----
-
-## 12. Default-Entscheidung
-
-> **Next.js standalone + SimpleWebAuthn + Cookie-Session + SQLite**, multi-user mit **Setup-Token-Onboarding**, Deploy auf **Raspberry Pi** hinter **Cloudflare Tunnel** als `dashboard.myalabor.ch`.
+> **Next.js Katalog hinter oauth2-proxy**, Passkeys bei **Pocket ID**, Cloudflare Tunnel als Edge. Dashboard baut **keine** App-Auth und **keine** Pair-Tokens in URLs.

@@ -1,16 +1,18 @@
 import { redirect } from "next/navigation";
 import { AppLauncherItem } from "@/components/app-icon";
-import { getAppsCatalog } from "@/lib/apps-catalog";
-import { readSession } from "@/lib/auth/session";
+import { getAppsForUser } from "@/lib/apps-catalog";
+import { pocketIdUrl, readGateUser, signOutPath } from "@/lib/auth/gate";
 import { LogoutButton } from "./logout-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppsPage() {
-  const session = await readSession();
+  const session = await readGateUser();
   if (!session) redirect("/");
 
-  const apps = getAppsCatalog();
+  const apps = getAppsForUser(session.userId, session.email);
+  const securityHref = "/settings/security";
+  const logoutHref = signOutPath();
 
   return (
     <main className="shell">
@@ -21,17 +23,25 @@ export default async function AppsPage() {
           <p className="muted">Hallo, {session.displayName}</p>
         </div>
         <div className="btn-row" style={{ marginTop: 0 }}>
+          <a className="btn btn-ghost" href={securityHref}>
+            Sicherheit
+          </a>
           {session.role === "admin" ? (
-            <a className="btn btn-ghost" href="/settings/tokens">
-              Tokens
+            <a
+              className="btn btn-ghost"
+              href={pocketIdUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              IdP
             </a>
           ) : null}
-          <LogoutButton />
+          <LogoutButton href={logoutHref} />
         </div>
       </div>
 
       {apps.length === 0 ? (
-        <p className="empty">Noch keine Apps konfiguriert.</p>
+        <p className="empty">Keine Apps für dieses Konto freigeschaltet.</p>
       ) : (
         <div className="icon-grid">
           {apps.map((app) => (

@@ -1,11 +1,14 @@
 import type { CatalogApp } from "@/lib/apps-catalog";
 
+/** Bump when icons change so CDNs/browsers refetch. */
+const ICON_REV = "2";
+
 const ICON_SRC: Record<CatalogApp["icon"], string> = {
-  cart: "/icons/apps/cart.svg",
-  tv: "/icons/apps/tv.svg",
-  car: "/icons/apps/car.svg",
-  cards: "/icons/apps/cards.svg",
-  notes: "/icons/apps/notes.svg",
+  cart: `/icons/apps/cart.svg?v=${ICON_REV}`,
+  tv: `/icons/apps/tv.svg?v=${ICON_REV}`,
+  car: `/icons/apps/car.svg?v=${ICON_REV}`,
+  cards: `/icons/apps/cards.svg?v=${ICON_REV}`,
+  notes: `/icons/apps/notes.svg?v=${ICON_REV}`,
 };
 
 export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
@@ -22,18 +25,28 @@ export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
   );
 }
 
+function subtitle(app: CatalogApp): string {
+  if (app.launchNote) return app.launchNote;
+  if (app.network === "lan") return "Nur Heimnetz";
+  if (app.authMode === "inherit" && app.handoff === "none") {
+    return "Noch kein inherit — Gate only";
+  }
+  return app.description;
+}
+
 export function AppLauncherItem({
   app,
 }: {
   app: CatalogApp;
 }) {
+  const title = [app.description, app.launchNote].filter(Boolean).join(" — ");
   return (
     <a
       className="app-icon"
       href={app.url}
       target="_blank"
       rel="noopener noreferrer"
-      title={app.description}
+      title={title}
     >
       <span className="app-icon-tile">
         <AppIcon icon={app.icon} />
@@ -44,6 +57,7 @@ export function AppLauncherItem({
         ) : null}
       </span>
       <span className="app-icon-label">{app.name}</span>
+      <span className="app-icon-meta">{subtitle(app)}</span>
     </a>
   );
 }

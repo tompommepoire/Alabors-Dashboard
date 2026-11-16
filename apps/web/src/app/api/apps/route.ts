@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { getAppsCatalog } from "@/lib/apps-catalog";
-import { readSession } from "@/lib/auth/session";
+import { getAppsForUser } from "@/lib/apps-catalog";
+import { readGateUser } from "@/lib/auth/gate";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await readSession();
+  const session = await readGateUser();
   if (!session) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ apps: getAppsCatalog() });
+  return NextResponse.json({
+    apps: getAppsForUser(session.userId, session.email),
+  });
 }
