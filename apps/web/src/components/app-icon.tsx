@@ -5,7 +5,8 @@ const ICON_SRC: Record<CatalogApp["icon"], string> = {
   tv: "/icons/apps/tv.svg",
   car: "/icons/apps/car.svg",
   cards: "/icons/apps/cards.svg",
-}
+  notes: "/icons/apps/notes.svg",
+};
 
 export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
   return (

@@ -5,7 +5,7 @@ export type CatalogApp = {
   name: string;
   description: string;
   url: string;
-  icon: "cart" | "tv" | "car" | "cards";
+  icon: "cart" | "tv" | "car" | "cards" | "notes";
   network: AppNetwork;
 };
 
@@ -47,6 +47,14 @@ export function getAppsCatalog(): CatalogApp[] {
         process.env.ANKI_LERN_URL ?? "https://anki-lern.myalabor.ch/"
       ).trim(),
       icon: "cards",
+      network: "public",
+    },
+    {
+      id: "mininotes",
+      name: "Notes",
+      description: "MiniNotes",
+      url: (process.env.NOTES_URL ?? "https://notes.myalabor.ch/").trim(),
+      icon: "notes",
       network: "public",
     },
   ];
