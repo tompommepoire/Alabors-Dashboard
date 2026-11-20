@@ -17,7 +17,7 @@ export type CatalogApp = {
   description: string;
   /** Start URL — Origin/path only; never pair/device tokens. */
   url: string;
-  icon: "cart" | "tv" | "car" | "cards" | "notes";
+  icon: "cart" | "tv" | "car" | "cards" | "notes" | "server";
   network: AppNetwork;
   authMode: AuthMode;
   handoff: HandoffStatus;
@@ -125,6 +125,18 @@ export function getAppsCatalog(): CatalogApp[] {
       authMode: "inherit",
       handoff: "none",
       launchNote: "Gate öffnet die App — inherit erst nach Exchange",
+    },
+    {
+      id: "server-manager",
+      name: "Server Manager",
+      description: "EliteBook Sleep / Wake / Apps",
+      url: (
+        process.env.SERVER_MANAGER_URL ?? "https://server.myalabor.ch/"
+      ).trim(),
+      icon: "server",
+      network: "public",
+      authMode: "shared",
+      handoff: "gate",
     },
   ];
   return apps.filter((app) => app.url.length > 0);

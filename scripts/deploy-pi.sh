@@ -124,6 +124,7 @@ LUMITO_URL=http://192.168.1.172:8080/
 ALABORS_DRIVE_URL=https://auto.myalabor.ch/web/drive.html
 ANKI_LERN_URL=https://anki-lern.myalabor.ch/
 NOTES_URL=https://notes.myalabor.ch/
+SERVER_MANAGER_URL=https://server.myalabor.ch/
 # EINKAUF_URL=https://einkaufen.myalabor.ch/
 EOF"
     echo "Fill ADMIN_SUBJECTS + APP_GRANTS in $PI_DATA/env after Pocket ID bootstrap" >&2

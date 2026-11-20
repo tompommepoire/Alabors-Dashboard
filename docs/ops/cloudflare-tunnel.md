@@ -9,16 +9,12 @@ Stand: Tor-1. Edge bleibt der bestehende Tunnel; Auth-Wahrheit ist Pocket ID + o
 | `auth.myalabor.ch` | `http://127.0.0.1:1411` (Pocket ID) |
 | `dashboard.myalabor.ch` | `http://127.0.0.1:4180` (oauth2-proxy → dashboard `:8790`) |
 | `einkaufen.myalabor.ch` | `http://127.0.0.1:4181` (oauth2-proxy → Einkauf) |
-| `anki-lern.myalabor.ch` | `http://127.0.0.1:4182` (oauth2-proxy → Anki, sobald live) |
-| `notes.myalabor.ch` | `http://127.0.0.1:4183` (oauth2-proxy → Notes, sobald live) |
+| `notes.myalabor.ch` | `http://127.0.0.1:4182` (oauth2-proxy → Notes) |
+| `auto.myalabor.ch` | `http://127.0.0.1:4183` (oauth2-proxy → eDrive) |
+| `server.myalabor.ch` | `http://127.0.0.1:4184` (oauth2-proxy → Toms Server Manager `:8792`) |
+| `anki-lern.myalabor.ch` | (oauth2-proxy → Anki, sobald live) |
 
-Bestehend (unverändert lassen, bis hinter Gate gezogen):
-
-| Public hostname | Service |
-|-----------------|---------|
-| `auto.myalabor.ch` | `https://localhost:8778` (AlaborsCar) |
-
-Ports `418x` sind Beispiele — an [deploy/auth](../../deploy/auth) anpassen.
+Ports `418x` an die jeweiligen `oauth2-proxy-*.cfg` anpassen.
 
 ## config.yml (Skizze)
 

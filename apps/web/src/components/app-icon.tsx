@@ -1,7 +1,7 @@
 import type { CatalogApp } from "@/lib/apps-catalog";
 
 /** Bump when icons change so CDNs/browsers refetch. */
-const ICON_REV = "2";
+const ICON_REV = "3";
 
 const ICON_SRC: Record<CatalogApp["icon"], string> = {
   cart: `/icons/apps/cart.svg?v=${ICON_REV}`,
@@ -9,6 +9,7 @@ const ICON_SRC: Record<CatalogApp["icon"], string> = {
   car: `/icons/apps/car.svg?v=${ICON_REV}`,
   cards: `/icons/apps/cards.svg?v=${ICON_REV}`,
   notes: `/icons/apps/notes.svg?v=${ICON_REV}`,
+  server: `/icons/apps/server.png?v=${ICON_REV}`,
 };
 
 export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
