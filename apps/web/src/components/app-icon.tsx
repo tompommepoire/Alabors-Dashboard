@@ -3,13 +3,12 @@
 import type { MouseEvent } from "react";
 import type { CatalogApp } from "@/lib/apps-catalog";
 import {
-  ANDROID_FIREFOX_PACKAGE,
   isAndroidUserAgent,
   toAndroidBrowserIntent,
 } from "@/lib/external-browser";
 
 /** Bump when icons change so CDNs/browsers refetch. */
-const ICON_REV = "3";
+const ICON_REV = "4";
 
 const ICON_SRC: Record<CatalogApp["icon"], string> = {
   cart: `/icons/apps/cart.svg?v=${ICON_REV}`,
@@ -18,6 +17,7 @@ const ICON_SRC: Record<CatalogApp["icon"], string> = {
   cards: `/icons/apps/cards.svg?v=${ICON_REV}`,
   notes: `/icons/apps/notes.svg?v=${ICON_REV}`,
   server: `/icons/apps/server.png?v=${ICON_REV}`,
+  voicemail: `/icons/apps/voicemail.png?v=${ICON_REV}`,
 };
 
 export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
@@ -36,7 +36,7 @@ export function AppIcon({ icon }: { icon: CatalogApp["icon"] }) {
 
 function subtitle(app: CatalogApp): string {
   if (app.launchNote) return app.launchNote;
-  if (app.network === "lan") return "Nur Heimnetz · öffnet Firefox";
+  if (app.network === "lan") return "Nur Heimnetz";
   if (app.authMode === "inherit" && app.handoff === "none") {
     return "Noch kein inherit — Gate only";
   }
@@ -59,12 +59,9 @@ export function AppLauncherItem({
 
   function onClick(e: MouseEvent<HTMLAnchorElement>) {
     if (!shouldOpenExternalBrowser(app)) return;
-    // Chrome Android cannot reliably open cleartext LAN http (HTTPS-First /
-    // local-network). Firefox can — and must stay on http:// to avoid a
-    // useless local-CA warning (Firefox ignores the system CA store).
-    const intent = toAndroidBrowserIntent(app.url, {
-      packageName: ANDROID_FIREFOX_PACKAGE,
-    });
+    // Escape PWA/Custom Tab into a real browser. Lumito LAN URL is https://:8443
+    // (profile picker); cleartext :8080 is rejected by Chrome HTTPS-First.
+    const intent = toAndroidBrowserIntent(app.url);
     if (!intent) return;
     e.preventDefault();
     window.location.assign(intent);

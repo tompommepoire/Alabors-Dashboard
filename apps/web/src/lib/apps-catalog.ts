@@ -17,7 +17,7 @@ export type CatalogApp = {
   description: string;
   /** Start URL — Origin/path only; never pair/device tokens. */
   url: string;
-  icon: "cart" | "tv" | "car" | "cards" | "notes" | "server";
+  icon: "cart" | "tv" | "car" | "cards" | "notes" | "server" | "voicemail";
   network: AppNetwork;
   authMode: AuthMode;
   handoff: HandoffStatus;
@@ -82,12 +82,12 @@ export function getAppsCatalog(): CatalogApp[] {
       id: "lumito",
       name: "Lumito",
       description: "Haus-IPTV",
-      url: (process.env.LUMITO_URL ?? "http://192.168.1.172:8080/").trim(),
+      url: (process.env.LUMITO_URL ?? "https://lumito.myalabor.ch/").trim(),
       icon: "tv",
-      network: "lan",
+      network: "public",
       authMode: "choose",
       handoff: "gate",
-      launchNote: "Account-Wahl in der App (app-local)",
+      launchNote: "Profilwahl in der App (Fire TV = LAN)",
     },
     {
       id: "alabors-drive",
@@ -125,6 +125,16 @@ export function getAppsCatalog(): CatalogApp[] {
       authMode: "inherit",
       handoff: "none",
       launchNote: "Gate öffnet die App — inherit erst nach Exchange",
+    },
+    {
+      id: "voicemail-manager",
+      name: "Voicemail",
+      description: "Monteur-Inbox",
+      url: (process.env.VOICEMAIL_URL ?? "https://voicemail.myalabor.ch/inbox").trim(),
+      icon: "voicemail",
+      network: "public",
+      authMode: "shared",
+      handoff: "gate",
     },
     {
       id: "server-manager",
